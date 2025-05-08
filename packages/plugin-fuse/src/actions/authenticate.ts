@@ -26,8 +26,9 @@ function parseCredentialsFromText(text: string): { email?: string; employeeNumbe
     result.email = emailMatch[1];
   }
 
-  // Match employee number (alphanumeric ID like FUS00005)
-  const empRegex = /\b([A-Z]{2,}\d{3,})\b/i;
+  // Match employee number: an alphanumeric word of at least 2 characters,
+  // typically after the email or preceded by a label like employeeNumber:
+  const empRegex = /(?:employeeNumber\s*[:\-]?\s*)?\b([A-Z]{1,}[0-9]{2,})\b/i;
   const empMatch = text.match(empRegex);
   if (empMatch) {
     result.employeeNumber = empMatch[1].toUpperCase();
@@ -35,6 +36,7 @@ function parseCredentialsFromText(text: string): { email?: string; employeeNumbe
 
   return result;
 }
+
 
 
 // A helper to call the external authentication API
@@ -45,6 +47,7 @@ async function authenticateWithBackend(
 ): Promise<{ otp?: string; token?: string }> {
   const apiUrl = "https://api.techfsn.com/api/bot/authenticate-client";
   const body = { email, employee_number, tenant };
+  elizaLogger.info("Calling authentication API with body: ", body);
   const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
@@ -56,8 +59,10 @@ async function authenticateWithBackend(
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    elizaLogger.error("Error response from API: ", errorData);
     throw new Error(errorData.message || response.statusText);
   }
+  elizaLogger.info("API responseBack: ", response);
   return (await response.json()).data || {};
 }
 
@@ -121,6 +126,7 @@ Example: "me@example.com FUS12345"`,
       try {
         const tenant = authState.cooperative;
         const data = await authenticateWithBackend(email, employeeNumber, tenant);
+        elizaLogger.info(`API response: `, data);
         if (!data.otp || !data.token) {
           throw new Error("Missing OTP or token from API response.");
         }
